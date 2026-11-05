@@ -184,7 +184,7 @@ def main():
 
     # ---------- 2. heatmap + typical day ----------
     t = ['<table><thead><tr><th class="d"></th>' + "".join(f"<th>{h:02d}</th>" for h in hours) + "</tr></thead><tbody>"]
-    for d in days:
+    for d in reversed(days):  # newest day (today) first
         t.append(f"<tr><th class='d'>{DAYS[d.weekday()]} {d:%d.%m.}</th>")
         for h in hours:
             s = cells.get((d, h))
