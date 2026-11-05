@@ -130,7 +130,8 @@ def main():
     )
 
     page = f"""<!doctype html><html lang="de"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(name)} Belegung</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="600"><title>{html.escape(name)} Belegung</title>
 <style>
 :root{{--bg:#fff;--fg:#1a2530;--mut:#6b7885;--none:#eceff2}}
 @media(prefers-color-scheme:dark){{:root{{--bg:#12171c;--fg:#e4e9ee;--mut:#8c98a4;--none:#222a31}}}}
