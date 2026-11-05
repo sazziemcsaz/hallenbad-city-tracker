@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="refresh" content="600"><title>Hallenbad City occupancy</title>
+<title>Hallenbad City occupancy</title>
 <style>
 :root{--bg:#fff;--fg:#1a2530;--mut:#6b7885;--none:#eceff2;--card:#f4f6f8;--line:hsl(210 75% 50%);--warn:#b7791f}
 @media(prefers-color-scheme:dark){:root{--bg:#12171c;--fg:#e4e9ee;--mut:#8c98a4;--none:#222a31;--card:#1a2128;--warn:#e0a63a}}
@@ -96,5 +96,7 @@ el.textContent=m<1?'just now':m<60?m+' min ago':Math.floor(m/60)+' h '+(m%60)+' 
 var h=+new Date().toLocaleString('en-GB',{timeZone:'Europe/Zurich',hour:'2-digit',hour12:false})%24;
 el.closest('.stat').classList.toggle('warn',h>=6&&h<22&&m>30);}
 up();setInterval(up,30000);})();
+// reload every 5 min with a throwaway query string so the browser cache (max-age=600) is bypassed
+setTimeout(function(){location.replace(location.pathname+'?r='+Date.now());},300000);
 </script>
 </body></html>
