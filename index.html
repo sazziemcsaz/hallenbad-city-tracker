@@ -1,31 +1,99 @@
-<!doctype html><html lang="de"><head><meta charset="utf-8">
+<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="refresh" content="600"><title>Hallenbad City Belegung</title>
+<meta http-equiv="refresh" content="600"><title>Hallenbad City occupancy</title>
 <style>
-:root{--bg:#fff;--fg:#1a2530;--mut:#6b7885;--none:#eceff2}
-@media(prefers-color-scheme:dark){:root{--bg:#12171c;--fg:#e4e9ee;--mut:#8c98a4;--none:#222a31}}
-body{background:var(--bg);color:var(--fg);font:15px system-ui,sans-serif;margin:0;padding:24px 16px;max-width:1000px;margin-inline:auto}
-h1{font-size:22px;margin:0 0 4px}p.s{color:var(--mut);margin:0 0 20px}
-.wrap{overflow-x:auto}table{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:2px;font-variant-numeric:tabular-nums}
+:root{--bg:#fff;--fg:#1a2530;--mut:#6b7885;--none:#eceff2;--card:#f4f6f8;--line:hsl(210 75% 50%);--warn:#b7791f}
+@media(prefers-color-scheme:dark){:root{--bg:#12171c;--fg:#e4e9ee;--mut:#8c98a4;--none:#222a31;--card:#1a2128;--warn:#e0a63a}}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px system-ui,sans-serif;margin:0 auto;padding:24px 16px 48px;max-width:1000px}
+h1{font-size:22px;margin:0 0 4px}p.s{color:var(--mut);margin:0 0 24px}
+h2{font-size:16px;margin:36px 0 10px}h2 small{font-weight:400;color:var(--mut);font-size:13px;margin-left:6px}
+.mut{color:var(--mut);font-size:13px}
+.card{background:var(--card);border-radius:12px;padding:14px 16px}
+.live{display:grid;grid-template-columns:minmax(0,230px) minmax(0,1fr);gap:14px}
+.hero{display:flex;flex-direction:column;justify-content:space-between;gap:10px}
+.big{font:500 56px/1.05 "Iowan Old Style",Georgia,"Times New Roman",serif;font-variant-numeric:tabular-nums lining-nums}
+.meter{height:8px;border-radius:4px;background:var(--none)}.meter i{display:block;height:8px;border-radius:4px;background:var(--line)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px}
+.stat b{display:block;font-weight:500;font-size:16px;margin-top:2px}
+.stat.warn{outline:1.5px solid var(--warn)}.stat.warn #ago::after{content:" - delayed";color:var(--warn)}
+.lg{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-bottom:4px}
+.lg i{display:inline-block;width:14px;height:0;border-top:2px solid var(--line);vertical-align:middle;margin-right:5px}
+.lg i.d{border-top:2px dashed var(--mut)}
+.wrap{overflow-x:auto}
+table{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:2px;font-variant-numeric:tabular-nums}
 th{font-weight:500;font-size:12px;color:var(--mut);padding:2px 4px}th.d{width:100px;text-align:left;white-space:nowrap;padding:2px 0}
 td{height:30px;text-align:center;font-size:12px;border-radius:4px}td.none{background:var(--none)}
-h2{font-size:16px;margin:28px 0 8px}
 .key{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:14px;font-size:13px}
 .key .k{display:flex;align-items:center;gap:6px}.key i{width:16px;height:16px;border-radius:4px;display:inline-block}
-.key em{color:var(--mut);font-style:normal}.key em::before{content:"· "}
-.today{width:100%;height:auto;display:block}.today text{fill:var(--mut);font-size:12px}
-.today .grid{stroke:var(--none);stroke-width:1}.today .ln{fill:none;stroke:hsl(210 75% 50%);stroke-width:2.5;stroke-linejoin:round}
-.today .col{fill:hsl(210 75% 50%)}
-.today .pt{fill:hsl(210 75% 50%);stroke:var(--bg);stroke-width:1.5}
+.key em{color:var(--mut);font-style:normal}.key em::before{content:"- "}
 .leg{margin-top:10px;color:var(--mut);font-size:12px}
+.chart{width:100%;height:auto;display:block}.chart text{fill:var(--mut);font-size:12px}
+.chart .grid{stroke:var(--none);stroke-width:1}
+.chart .ln{fill:none;stroke:var(--line);stroke-width:2.5;stroke-linejoin:round}
+.chart .ty{fill:none;stroke:var(--mut);stroke-width:1.5;stroke-dasharray:4 3}
+.chart .pt{fill:var(--line);stroke:var(--bg);stroke-width:1.5}.chart .col{fill:var(--line)}
+.verdict{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.verdict .t{font-size:16px;font-weight:500}
+.best{display:grid;gap:6px;margin-top:6px}
+.best .r{display:flex;align-items:center;gap:10px;font-size:13px}
+.best .d{width:32px}.best .w{width:100px;font-variant-numeric:tabular-nums}
+.best .bar{flex:1;height:10px;border-radius:5px;background:var(--card)}.best .bar i{display:block;height:10px;border-radius:5px;background:var(--line)}
+.best .v{width:92px;text-align:right;color:var(--mut);font-size:12px}.best .v.top{color:var(--line)}
+.note{background:var(--card);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--mut);margin-bottom:12px}
+@media(max-width:640px){.live{grid-template-columns:1fr}.stats{grid-template-columns:1fr}.big{font-size:48px}}
 </style></head><body>
-<h1>Hallenbad City – Belegung</h1>
-<p class="s">Zeitraum 30.10.–05.11.2026 · 5 Messungen · Wert = Auslastung in % (ø pro Stunde), letzte Messung 05.11. 12:02</p>
-<div class="wrap"><table><thead><tr><th class="d"></th><th>06</th><th>07</th><th>08</th><th>09</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th><th>19</th><th>20</th><th>21</th><th>22</th></tr></thead><tbody><tr><th class='d'>Fr 30.10.</th><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td></tr><tr><th class='d'>Sa 31.10.</th><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td></tr><tr><th class='d'>So 01.11.</th><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td></tr><tr><th class='d'>Mo 02.11.</th><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td></tr><tr><th class='d'>Di 03.11.</th><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td></tr><tr><th class='d'>Mi 04.11.</th><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td></tr><tr><th class='d'>Do 05.11.</th><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td style='background:hsl(210 75% 64%);color:#123' title='Do 05.11. 11:00 · ø 121 Gäste · 4 Messung(en)'>55</td><td style='background:hsl(210 75% 62%);color:#123' title='Do 05.11. 12:00 · ø 128 Gäste · 1 Messung(en)'>58</td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td></tr></tbody></table></div>
-<div class="key"><span class='k'><i style='background:hsl(210 75% 96%)'></i><b>0%</b> = 0 Gäste<em>leer</em></span><span class='k'><i style='background:hsl(210 75% 82%)'></i><b>25%</b> = 55 Gäste<em>ruhig</em></span><span class='k'><i style='background:hsl(210 75% 67%)'></i><b>50%</b> = 110 Gäste<em>belebt</em></span><span class='k'><i style='background:hsl(210 75% 52%)'></i><b>75%</b> = 165 Gäste<em>voll</em></span><span class='k'><i style='background:hsl(210 75% 38%)'></i><b>100%</b> = 220 Gäste<em>Maximum</em></span></div>
-<p class="leg">Hell = leer, dunkelblau = voll, rot = über Kapazität, grau = keine Messung. Ein 0-Wert kann «leer» oder «geschlossen» heissen.</p>
-<h2>Heute, Do 05.11. – alle Messungen (5)</h2>
-<svg viewBox="0 0 1000 280" role="img" aria-label="Verlauf heute" class="today"><line x1="104" x2="998" y1="250.0" y2="250.0" class="grid"/><text x="0" y="254.0" text-anchor="start">0% · 0</text><line x1="104" x2="998" y1="191.0" y2="191.0" class="grid"/><text x="0" y="195.0" text-anchor="start">25% · 55</text><line x1="104" x2="998" y1="132.0" y2="132.0" class="grid"/><text x="0" y="136.0" text-anchor="start">50% · 110</text><line x1="104" x2="998" y1="73.0" y2="73.0" class="grid"/><text x="0" y="77.0" text-anchor="start">75% · 165</text><line x1="104" x2="998" y1="14.0" y2="14.0" class="grid"/><text x="0" y="18.0" text-anchor="start">100% · 220</text><text x="130.3" y="272" text-anchor="middle">06</text><text x="182.9" y="272" text-anchor="middle">07</text><text x="235.5" y="272" text-anchor="middle">08</text><text x="288.1" y="272" text-anchor="middle">09</text><text x="340.6" y="272" text-anchor="middle">10</text><text x="393.2" y="272" text-anchor="middle">11</text><text x="445.8" y="272" text-anchor="middle">12</text><text x="498.4" y="272" text-anchor="middle">13</text><text x="551.0" y="272" text-anchor="middle">14</text><text x="603.6" y="272" text-anchor="middle">15</text><text x="656.2" y="272" text-anchor="middle">16</text><text x="708.8" y="272" text-anchor="middle">17</text><text x="761.4" y="272" text-anchor="middle">18</text><text x="813.9" y="272" text-anchor="middle">19</text><text x="866.5" y="272" text-anchor="middle">20</text><text x="919.1" y="272" text-anchor="middle">21</text><text x="971.7" y="272" text-anchor="middle">22</text><polyline points="395.9,120.2 402.0,118.1 410.8,123.4 411.6,120.2 421.3,112.7" class="ln"/><circle cx="395.9" cy="120.2" r="3.5" class="pt"><title>11:33 · 121 Gäste · 55%</title></circle><circle cx="402.0" cy="118.1" r="3.5" class="pt"><title>11:40 · 123 Gäste · 56%</title></circle><circle cx="410.8" cy="123.4" r="3.5" class="pt"><title>11:50 · 118 Gäste · 54%</title></circle><circle cx="411.6" cy="120.2" r="3.5" class="pt"><title>11:51 · 121 Gäste · 55%</title></circle><circle cx="421.3" cy="112.7" r="3.5" class="pt"><title>12:02 · 128 Gäste · 58%</title></circle></svg>
-<h2>Typischer Tagesverlauf (ø aller Messungen)</h2>
-<svg viewBox="0 0 1000 220" role="img" aria-label="Typischer Tagesverlauf" class="today"><line x1="104" x2="998" y1="190.0" y2="190.0" class="grid"/><text x="0" y="194.0" text-anchor="start">0% · 0</text><line x1="104" x2="998" y1="146.0" y2="146.0" class="grid"/><text x="0" y="150.0" text-anchor="start">25% · 55</text><line x1="104" x2="998" y1="102.0" y2="102.0" class="grid"/><text x="0" y="106.0" text-anchor="start">50% · 110</text><line x1="104" x2="998" y1="58.0" y2="58.0" class="grid"/><text x="0" y="62.0" text-anchor="start">75% · 165</text><line x1="104" x2="998" y1="14.0" y2="14.0" class="grid"/><text x="0" y="18.0" text-anchor="start">100% · 220</text><text x="130.3" y="212" text-anchor="middle">06</text><text x="182.9" y="212" text-anchor="middle">07</text><text x="235.5" y="212" text-anchor="middle">08</text><text x="288.1" y="212" text-anchor="middle">09</text><text x="340.6" y="212" text-anchor="middle">10</text><text x="393.2" y="212" text-anchor="middle">11</text><rect x="367.9" y="93.4" width="50.6" height="96.6" rx="3" class="col"><title>11:00 · ø 121 Gäste · 55% · 4 Messung(en)</title></rect><text x="445.8" y="212" text-anchor="middle">12</text><rect x="420.5" y="87.6" width="50.6" height="102.4" rx="3" class="col"><title>12:00 · ø 128 Gäste · 58% · 1 Messung(en)</title></rect><text x="498.4" y="212" text-anchor="middle">13</text><text x="551.0" y="212" text-anchor="middle">14</text><text x="603.6" y="212" text-anchor="middle">15</text><text x="656.2" y="212" text-anchor="middle">16</text><text x="708.8" y="212" text-anchor="middle">17</text><text x="761.4" y="212" text-anchor="middle">18</text><text x="813.9" y="212" text-anchor="middle">19</text><text x="866.5" y="212" text-anchor="middle">20</text><text x="919.1" y="212" text-anchor="middle">21</text><text x="971.7" y="212" text-anchor="middle">22</text></svg>
+<h1>Hallenbad City - occupancy</h1>
+<p class="s">Zurich time - 5 samples since 05 Nov 2026, last sample 05 Nov 12:02</p>
+
+<h2>Live now</h2>
+
+<div class="live">
+  <div class="card hero">
+    <div class="mut">Latest sample, 12:02</div>
+    <div class="big">128</div>
+    <div>
+      <div class="mut" style="margin-bottom:6px">guests - 58% of 220 - busy</div>
+      <div class="meter"><i style="width:58%"></i></div>
+    </div>
+  </div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <b style="font-weight:500">Today, Thu 05 Nov</b>
+      <span class="lg"><span><i></i>today</span></span>
+    </div>
+    <svg viewBox="0 0 600 200" class="chart" role="img" aria-label="Today's occupancy"><line class="grid" x1="34" x2="594" y1="178.0" y2="178.0"/><text x="0" y="182.0">0</text><line class="grid" x1="34" x2="594" y1="94.0" y2="94.0"/><text x="0" y="98.0">110</text><line class="grid" x1="34" x2="594" y1="10.0" y2="10.0"/><text x="0" y="14.0">220</text><text x="34.0" y="195" text-anchor="middle">06</text><text x="165.8" y="195" text-anchor="middle">10</text><text x="297.5" y="195" text-anchor="middle">14</text><text x="429.3" y="195" text-anchor="middle">18</text><text x="561.1" y="195" text-anchor="middle">22</text><polyline class="ln" points="216.8,85.6 220.7,84.1 226.2,87.9 226.7,85.6 232.7,80.3"/><circle class="pt" r="3.5" cx="216.8" cy="85.6"><title>11:33 - 121 guests (55%)</title></circle><circle class="pt" r="3.5" cx="220.7" cy="84.1"><title>11:40 - 123 guests (56%)</title></circle><circle class="pt" r="3.5" cx="226.2" cy="87.9"><title>11:50 - 118 guests (54%)</title></circle><circle class="pt" r="3.5" cx="226.7" cy="85.6"><title>11:51 - 121 guests (55%)</title></circle><circle class="pt" r="3.5" cx="232.7" cy="80.3"><title>12:02 - 128 guests (58%)</title></circle></svg>
+  </div>
+</div>
+<div class="stats">
+  <div class="card stat"><span class="mut">Peak today</span><b>12:02 - 128 guests</b></div>
+  <div class="card stat"><span class="mut">Quietest so far today</span><b>11:50 - 118 guests</b></div>
+  <div class="card stat"><span class="mut">Last sample</span><b id="ago" data-ts="2026-11-05T12:02:27+01:00">12:02</b></div>
+</div>
+
+<h2>Last 7 days <small>average occupancy per hour, in %</small></h2>
+<div class="wrap"><table><thead><tr><th class="d"></th><th>06</th><th>07</th><th>08</th><th>09</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th><th>19</th><th>20</th><th>21</th><th>22</th></tr></thead><tbody><tr><th class='d'>Fri 30.10.</th><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td></tr><tr><th class='d'>Sat 31.10.</th><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td></tr><tr><th class='d'>Sun 01.11.</th><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td></tr><tr><th class='d'>Mon 02.11.</th><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td></tr><tr><th class='d'>Tue 03.11.</th><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td></tr><tr><th class='d'>Wed 04.11.</th><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td></tr><tr><th class='d'>Thu 05.11.</th><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td style='background:hsl(210 75% 64%);color:#123' title='Thu 05.11. 11:00 - avg 121 guests - 4 sample(s)'>55</td><td style='background:hsl(210 75% 62%);color:#123' title='Thu 05.11. 12:00 - avg 128 guests - 1 sample(s)'>58</td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td><td class='none'></td></tr></tbody></table></div>
+<div class="key"><span class='k'><i style='background:hsl(210 75% 96%)'></i><b>0%</b> = 0 guests<em>empty</em></span><span class='k'><i style='background:hsl(210 75% 82%)'></i><b>25%</b> = 55 guests<em>quiet</em></span><span class='k'><i style='background:hsl(210 75% 67%)'></i><b>50%</b> = 110 guests<em>busy</em></span><span class='k'><i style='background:hsl(210 75% 52%)'></i><b>75%</b> = 165 guests<em>full</em></span><span class='k'><i style='background:hsl(210 75% 38%)'></i><b>100%</b> = 220 guests<em>at capacity</em></span></div>
+<p class="leg">Light = empty, dark blue = full, red = over capacity, grey = no sample. A 0 can mean empty or closed.</p>
+<h2>Typical day <small>average of all samples</small></h2>
+<svg viewBox="0 0 1000 220" class="chart" role="img" aria-label="Typical day"><line class="grid" x1="104" x2="998" y1="190.0" y2="190.0"/><text x="0" y="194.0">0% - 0</text><line class="grid" x1="104" x2="998" y1="145.0" y2="145.0"/><text x="0" y="149.0">25% - 55</text><line class="grid" x1="104" x2="998" y1="100.0" y2="100.0"/><text x="0" y="104.0">50% - 110</text><line class="grid" x1="104" x2="998" y1="55.0" y2="55.0"/><text x="0" y="59.0">75% - 165</text><line class="grid" x1="104" x2="998" y1="10.0" y2="10.0"/><text x="0" y="14.0">100% - 220</text><text x="130.3" y="212" text-anchor="middle">06</text><text x="182.9" y="212" text-anchor="middle">07</text><text x="235.5" y="212" text-anchor="middle">08</text><text x="288.1" y="212" text-anchor="middle">09</text><text x="340.6" y="212" text-anchor="middle">10</text><text x="393.2" y="212" text-anchor="middle">11</text><rect class="col" rx="3" x="367.9" y="91.2" width="50.6" height="98.8"><title>11:00 - avg 121 guests - 55% - 4 sample(s)</title></rect><text x="445.8" y="212" text-anchor="middle">12</text><rect class="col" rx="3" x="420.5" y="85.3" width="50.6" height="104.7"><title>12:00 - avg 128 guests - 58% - 1 sample(s)</title></rect><text x="498.4" y="212" text-anchor="middle">13</text><text x="551.0" y="212" text-anchor="middle">14</text><text x="603.6" y="212" text-anchor="middle">15</text><text x="656.2" y="212" text-anchor="middle">16</text><text x="708.8" y="212" text-anchor="middle">17</text><text x="761.4" y="212" text-anchor="middle">18</text><text x="813.9" y="212" text-anchor="middle">19</text><text x="866.5" y="212" text-anchor="middle">20</text><text x="919.1" y="212" text-anchor="middle">21</text><text x="971.7" y="212" text-anchor="middle">22</text></svg>
+
+<h2>Best time to go <small>preview</small></h2>
+
+<div class="note">Preview: based on 1 day of data. It only becomes meaningful after a few weeks.</div>
+<div class="card">
+  <div class="verdict">
+    <div><div class="t">Right now it's busy (58%)</div><div class="mut">Not enough data for a forecast yet.</div></div>
+  </div>
+  <div class="mut">Quietest two hours per weekday (average of all samples)</div>
+  <div class="best"><div class="r"><span class="d">Mon</span><span class="w mut">no data yet</span><div class="bar"></div><span class="v"></span></div><div class="r"><span class="d">Tue</span><span class="w mut">no data yet</span><div class="bar"></div><span class="v"></span></div><div class="r"><span class="d">Wed</span><span class="w mut">no data yet</span><div class="bar"></div><span class="v"></span></div><div class="r"><span class="d">Thu</span><span class="w">11-13h</span><div class="bar"><i style="width:57%"></i></div><span class="v top">57% - best</span></div><div class="r"><span class="d">Fri</span><span class="w mut">no data yet</span><div class="bar"></div><span class="v"></span></div><div class="r"><span class="d">Sat</span><span class="w mut">no data yet</span><div class="bar"></div><span class="v"></span></div><div class="r"><span class="d">Sun</span><span class="w mut">no data yet</span><div class="bar"></div><span class="v"></span></div></div>
+</div>
+<script>
+(function(){var el=document.getElementById('ago');if(!el)return;var t=Date.parse(el.dataset.ts);
+function up(){var m=Math.max(0,Math.round((Date.now()-t)/60000));
+el.textContent=m<1?'just now':m<60?m+' min ago':Math.floor(m/60)+' h '+(m%60)+' min ago';
+var h=+new Date().toLocaleString('en-GB',{timeZone:'Europe/Zurich',hour:'2-digit',hour12:false})%24;
+el.closest('.stat').classList.toggle('warn',h>=6&&h<22&&m>30);}
+up();setInterval(up,30000);})();
+</script>
 </body></html>
