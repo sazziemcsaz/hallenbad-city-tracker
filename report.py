@@ -92,6 +92,8 @@ el.textContent=m<1?'just now':m<60?m+' min ago':Math.floor(m/60)+' h '+(m%60)+' 
 var h=+new Date().toLocaleString('en-GB',{timeZone:'Europe/Zurich',hour:'2-digit',hour12:false})%24;
 el.closest('.stat').classList.toggle('warn',h>=__FROM__&&h<__TO__&&m>30);}
 up();setInterval(up,30000);})();
+// reload every 5 min with a throwaway query string so the browser cache (max-age=600) is bypassed
+setTimeout(function(){location.replace(location.pathname+'?r='+Date.now());},300000);
 """.replace("__FROM__", str(OPEN_FROM)).replace("__TO__", str(OPEN_TO))
 
 
@@ -272,7 +274,7 @@ def main():
 
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="refresh" content="600"><title>{html.escape(name)} occupancy</title>
+<title>{html.escape(name)} occupancy</title>
 <style>{CSS}</style></head><body>
 <h1>{html.escape(name)} - occupancy</h1>
 <p class="s">Zurich time - {len(own)} own samples{f" + {len(city)} city sensor readings" if city else ""} since {rows[0][0]:%d %b %Y}, last sample {last_ts:%d %b %H:%M}</p>
