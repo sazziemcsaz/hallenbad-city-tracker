@@ -100,11 +100,17 @@ def main():
     ap.add_argument("--csv", default=os.path.join(HERE, "occupancy.csv"))
     ap.add_argument("--out", default=os.path.join(HERE, "report.html"))
     ap.add_argument("--days", type=int, default=7)
+    ap.add_argument("--backfill", default=os.path.join(HERE, "backfill_city.csv"),
+                    help="city open-data history; used only before our own first sample")
     a = ap.parse_args()
 
-    rows = load(a.csv)
-    if not rows:
+    own = load(a.csv)
+    if not own:
         raise SystemExit("no data yet")
+    city = []
+    if os.path.exists(a.backfill):  # our own samples win from their first timestamp on
+        city = [r for r in load(a.backfill) if r[0] < own[0][0]]
+    rows = sorted(city + own, key=lambda r: r[0])
     name = rows[0][3]
     cap = rows[-1][2]
     last_ts, last_cur = rows[-1][0], rows[-1][1]
@@ -260,12 +266,16 @@ def main():
   <div class="best">{''.join(rows_html)}</div>
 </div>"""
 
+    city_note = (f'<p class="leg">Before {own[0][0]:%d %b %H:%M} the values come from the city\'s open-data sensor series '
+                 f'(Stadt Zürich, CC0) and may read higher than the live feed; from then on they are our own samples.</p>'
+                 if city else "")
+
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="refresh" content="600"><title>{html.escape(name)} occupancy</title>
 <style>{CSS}</style></head><body>
 <h1>{html.escape(name)} - occupancy</h1>
-<p class="s">Zurich time - {len(rows)} samples since {rows[0][0]:%d %b %Y}, last sample {last_ts:%d %b %H:%M}</p>
+<p class="s">Zurich time - {len(own)} own samples{f" + {len(city)} city sensor readings" if city else ""} since {rows[0][0]:%d %b %Y}, last sample {last_ts:%d %b %H:%M}</p>
 
 <h2>Live now</h2>
 {live}
@@ -274,6 +284,7 @@ def main():
 <div class="wrap">{''.join(t)}</div>
 <div class="key">{key}</div>
 <p class="leg">Light = empty, dark blue = full, red = over capacity, grey = no sample. A 0 can mean empty or closed.</p>
+{city_note}
 <h2>Typical day <small>average of all samples</small></h2>
 {''.join(ps)}
 
