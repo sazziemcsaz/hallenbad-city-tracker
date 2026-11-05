@@ -4,7 +4,7 @@
 
 Tracks how busy the [Hallenbad City](https://www.stadt-zuerich.ch/de/stadtleben/sport-und-erholung/sport-und-badeanlagen/hallenbaeder/city.html)
 in Zürich is, through the day and over the week. The city only shows the *current* number of guests, so this
-project samples it every 10 minutes and builds the history itself.
+project samples it every 10 minutes during opening hours and builds the history itself.
 
 ## What the page shows
 
@@ -16,7 +16,7 @@ project samples it every 10 minutes and builds the history itself.
 
 ## How it works
 
-1. A scheduled GitHub Action ([`collect.yml`](.github/workflows/collect.yml)) runs every 10 minutes.
+1. A scheduled GitHub Action ([`collect.yml`](.github/workflows/collect.yml)) runs every 10 minutes while the pool is open (06:00–22:00 Zürich time).
 2. [`collect.py`](collect.py) reads the live occupancy from the same public WebSocket feed the city's page uses
    (`wss://badi-public.crowdmonitor.ch:9591/api`) and appends one row to [`occupancy.csv`](occupancy.csv).
 3. [`report.py`](report.py) turns the CSV into `index.html`, which GitHub Pages serves.

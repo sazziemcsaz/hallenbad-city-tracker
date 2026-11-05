@@ -1,10 +1,12 @@
 name: collect
 
-# Every 10 minutes (UTC clock, but */10 is the same in every timezone):
-# take one sample, rebuild the report, commit both back to the repo.
+# Every 10 minutes while the pool is open (06:00-22:00 Zürich time).
+# GitHub cron runs in UTC and Zürich is UTC+1/+2, so the cron window below is
+# deliberately a bit wide (04-21 UTC); collect.py --open-hours does the exact check.
+# Take one sample, rebuild the report, commit both back to the repo.
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/10 4-21 * * *"
   workflow_dispatch: # lets you run it by hand from the Actions tab
 
 permissions:
@@ -20,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Take a sample
-        run: python3 collect.py
+        run: python3 collect.py --open-hours 6-22
       - name: Rebuild the report
         run: python3 report.py --out index.html
       - name: Save to the repo

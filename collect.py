@@ -7,6 +7,7 @@ with uid / name / maxspace / currentfill for every pool. Stdlib only.
 
 Usage:  python3 collect.py            # one sample, appended to occupancy.csv
         python3 collect.py --uid SSD-7  # another pool (e.g. Oerlikon)
+        python3 collect.py --open-hours 6-22  # skip samples outside opening hours
 """
 import argparse, base64, csv, json, os, socket, ssl, struct, sys
 from datetime import datetime
@@ -72,7 +73,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--uid", default="SSD-4", help="pool id (SSD-4 = Hallenbad City)")
     ap.add_argument("--out", default=os.path.join(HERE, "occupancy.csv"))
+    ap.add_argument("--open-hours", metavar="6-22",
+                    help="only sample between these Zürich hours (inclusive); outside, exit quietly")
     args = ap.parse_args()
+
+    now_dt = datetime.now(ZoneInfo("Europe/Zurich"))
+    if args.open_hours:
+        lo, hi = (int(x) for x in args.open_hours.split("-"))
+        if not lo * 60 <= now_dt.hour * 60 + now_dt.minute <= hi * 60:
+            print(f"{now_dt:%H:%M} Zürich time: outside {lo:02d}:00-{hi:02d}:00, skipping")
+            return
 
     pool = next((p for p in fetch_all() if p["uid"] == args.uid), None)
     if pool is None:
@@ -81,7 +91,7 @@ def main():
     if mx <= 0 or cur < 0:
         sys.exit(f"invalid data for {args.uid}: current={cur} max={mx}")  # page treats this as invalid too
 
-    now = datetime.now(ZoneInfo("Europe/Zurich")).isoformat(timespec="seconds")
+    now = now_dt.isoformat(timespec="seconds")
     row = [now, pool["uid"], pool["name"], int(cur), int(mx), round(100 * cur / mx, 1)]
     new = not os.path.exists(args.out)
     with open(args.out, "a", newline="") as f:
