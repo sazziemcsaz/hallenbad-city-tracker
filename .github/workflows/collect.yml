@@ -1,0 +1,32 @@
+name: collect
+
+# Every 10 minutes (UTC clock, but */10 is the same in every timezone):
+# take one sample, rebuild the report, commit both back to the repo.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: # lets you run it by hand from the Actions tab
+
+permissions:
+  contents: write # needed so the job can push the new CSV row
+
+concurrency:
+  group: collect
+  cancel-in-progress: false # never run two at once, they'd clash on the push
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Take a sample
+        run: python3 collect.py
+      - name: Rebuild the report
+        run: python3 report.py --out index.html
+      - name: Save to the repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add occupancy.csv index.html
+          git commit -m "sample $(date -u +%Y-%m-%dT%H:%MZ)" || exit 0
+          git push
