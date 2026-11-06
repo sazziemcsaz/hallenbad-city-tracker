@@ -74,6 +74,11 @@ td{height:30px;text-align:center;font-size:12px;border-radius:4px}td.none{backgr
 .chart .ln{fill:none;stroke:var(--line);stroke-width:2.5;stroke-linejoin:round}
 .chart .ty{fill:none;stroke:var(--mut);stroke-width:1.5;stroke-dasharray:4 3}
 .chart .pt{fill:var(--line);stroke:var(--bg);stroke-width:1.5}.chart .col{fill:var(--line)}
+.chart .hv{fill:var(--fg);font-size:11px}.chart .nowl{font-size:13px;font-weight:500;fill:var(--line)}
+.chart .pt.now{stroke:var(--line);stroke-width:2;fill:var(--bg)}
+.hm-m{display:none}.pm{display:none}
+table.m th{font-size:11px;line-height:1.25}table.m th.h{width:34px;text-align:right;padding-right:6px}
+table.m td{height:28px;font-size:13px}
 .verdict{display:flex;gap:12px;align-items:center;margin-bottom:12px}
 .verdict .t{font-size:16px;font-weight:500}
 .best{display:grid;gap:6px;margin-top:6px}
@@ -82,7 +87,11 @@ td{height:30px;text-align:center;font-size:12px;border-radius:4px}td.none{backgr
 .best .bar{flex:1;height:10px;border-radius:5px;background:var(--card)}.best .bar i{display:block;height:10px;border-radius:5px;background:var(--line)}
 .best .v{width:92px;text-align:right;color:var(--mut);font-size:12px}.best .v.top{color:var(--line)}
 .note{background:var(--card);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--mut);margin-bottom:12px}
-@media(max-width:640px){.live{grid-template-columns:1fr}.stats{grid-template-columns:1fr}.big{font-size:48px}}
+@media(max-width:640px){.live{grid-template-columns:1fr}.stats{grid-template-columns:1fr}.big{font-size:48px}
+.hm-d{display:none}.hm-m{display:block}
+.chart .pc{display:none}.chart.t text{font-size:19px}.chart.t .hv{font-size:17px}.chart.t .nowl{font-size:20px}
+.hv.odd{display:none}.pd{display:none}.pm{display:block}.chart.pm text{font-size:13px}
+.best .w{width:84px}.best .v{width:76px}}
 """
 
 AGO_JS = """
@@ -134,15 +143,16 @@ def main():
     today = [r for r in rows if r[0].date() == last_ts.date()]
     other = [r for r in rows if r[0].date() != last_ts.date()]
     ymax = max(cap, max(r[1] for r in today))
-    W, H, L, R, T, B = 600, 200, 34, 6, 10, 22
+    W, H, L, R, T, B = 600, 220, 62, 8, 20, 24
     X = lambda t: L + (t - x0) / (x1 - x0) * (W - L - R)
     Y = lambda c: T + (1 - c / ymax) * (H - T - B)
-    sv = [f'<svg viewBox="0 0 {W} {H}" class="chart" role="img" aria-label="Today\'s occupancy">']
-    for p in (0, 50, 100):
-        sv.append(f'<line class="grid" x1="{L}" x2="{W-R}" y1="{Y(cap*p/100):.1f}" y2="{Y(cap*p/100):.1f}"/>'
-                  f'<text x="0" y="{Y(cap*p/100)+4:.1f}">{round(cap*p/100)}</text>')
-    for h in range(x0, x1 + 1, 4):
-        sv.append(f'<text x="{X(h):.1f}" y="{H-5}" text-anchor="middle">{h:02d}</text>')
+    sv = [f'<svg viewBox="0 0 {W} {H}" class="chart t" role="img" aria-label="Today\'s occupancy">']
+    for p in (0, 25, 50, 75, 100):  # y axis: guests, with the percentage on wide screens
+        y = Y(cap * p / 100)
+        sv.append(f'<line class="grid" x1="{L}" x2="{W-R}" y1="{y:.1f}" y2="{y:.1f}"/>'
+                  f'<text x="0" y="{y+4:.1f}"><tspan class="pc">{p}% - </tspan>{round(cap*p/100)}</text>')
+    for h in range(x0, x1 + 1, 2):  # x axis: every 2 hours
+        sv.append(f'<text x="{X(h):.1f}" y="{H-6}" text-anchor="middle">{h:02d}</text>')
     by_hour_other = defaultdict(list)
     for ts, cur, _, _ in other:
         by_hour_other[ts.hour].append(cur)
@@ -151,8 +161,19 @@ def main():
         sv.append('<polyline class="ty" points="' + " ".join(f"{X(t):.1f},{Y(c):.1f}" for t, c in typical) + '"/>')
     pts = [(ts.hour + ts.minute / 60, cur, ts) for ts, cur, _, _ in today]
     sv.append('<polyline class="ln" points="' + " ".join(f"{X(t):.1f},{Y(c):.1f}" for t, c, _ in pts) + '"/>')
+    r_dot = 3.5 if len(pts) <= 30 else 2
     for t, c, ts in pts:
-        sv.append(f'<circle class="pt" r="3.5" cx="{X(t):.1f}" cy="{Y(c):.1f}"><title>{ts:%H:%M} - {c} guests ({100*c/cap:.0f}%)</title></circle>')
+        sv.append(f'<circle class="pt" r="{r_dot}" cx="{X(t):.1f}" cy="{Y(c):.1f}"><title>{ts:%H:%M} - {c} guests ({100*c/cap:.0f}%)</title></circle>')
+    now_t, now_c = pts[-1][0], pts[-1][1]
+    for h in range(x0, x1):  # a number at every full hour (from the sample nearest to it)
+        near = min(((abs(t - h), t, c) for t, c, _ in pts), default=None)
+        if near and near[0] <= 10 / 60 and abs(near[1] - now_t) > 0.4:
+            yy = Y(near[2]) - 7 if Y(near[2]) > T + 10 else Y(near[2]) + 15
+            sv.append(f'<text class="hv{" odd" if (h - x0) % 2 else ""}" x="{X(near[1]):.1f}" y="{yy:.1f}" '
+                      f'text-anchor="middle">{near[2]}</text>')
+    yy = Y(now_c) - 9 if Y(now_c) > T + 12 else Y(now_c) + 17
+    sv.append(f'<circle class="pt now" r="5" cx="{X(now_t):.1f}" cy="{Y(now_c):.1f}"/>'
+              f'<text class="hv nowl" x="{min(X(now_t), W - R - 14):.1f}" y="{yy:.1f}" text-anchor="middle">{now_c}</text>')
     sv.append("</svg>")
     typ_leg = '<span><i class="d"></i>typical</span>' if len(typical) >= 2 else ""
 
@@ -183,20 +204,27 @@ def main():
 </div>"""
 
     # ---------- 2. heatmap + typical day ----------
+    def cell(d, h):
+        s = cells.get((d, h))
+        if not s:
+            return "<td class='none'></td>"
+        pct = mean([100 * c / m for c, m in s])
+        bg, fg = colour(pct)
+        tip = f"{DAYS[d.weekday()]} {d:%d.%m.} {h:02d}:00 - avg {mean([c for c, _ in s]):.0f} guests - {len(s)} sample(s)"
+        return f"<td style='background:{bg};color:{fg}' title='{html.escape(tip)}'>{pct:.0f}</td>"
+
+    newest_first = list(reversed(days))  # today first
+    # wide screens: one row per day, hours across
     t = ['<table><thead><tr><th class="d"></th>' + "".join(f"<th>{h:02d}</th>" for h in hours) + "</tr></thead><tbody>"]
-    for d in reversed(days):  # newest day (today) first
-        t.append(f"<tr><th class='d'>{DAYS[d.weekday()]} {d:%d.%m.}</th>")
-        for h in hours:
-            s = cells.get((d, h))
-            if not s:
-                t.append("<td class='none'></td>")
-                continue
-            pct = mean([100 * c / m for c, m in s])
-            bg, fg = colour(pct)
-            tip = f"{DAYS[d.weekday()]} {d:%d.%m.} {h:02d}:00 - avg {mean([c for c, _ in s]):.0f} guests - {len(s)} sample(s)"
-            t.append(f"<td style='background:{bg};color:{fg}' title='{html.escape(tip)}'>{pct:.0f}</td>")
-        t.append("</tr>")
+    for d in newest_first:
+        t.append(f"<tr><th class='d'>{DAYS[d.weekday()]} {d:%d.%m.}</th>" + "".join(cell(d, h) for h in hours) + "</tr>")
     t.append("</tbody></table>")
+    # phones: one row per hour, days across (7 wide columns instead of 17 squeezed ones)
+    mt = ['<table class="m"><thead><tr><th class="h"></th>'
+          + "".join(f"<th>{DAYS[d.weekday()]}<br>{d:%d.%m.}</th>" for d in newest_first) + "</tr></thead><tbody>"]
+    for h in hours:
+        mt.append(f"<tr><th class='h'>{h:02d}</th>" + "".join(cell(d, h) for d in newest_first) + "</tr>")
+    mt.append("</tbody></table>")
     key = "".join(
         f"<span class='k'><i style='background:{colour(p)[0]}'></i><b>{p}%</b> = {round(cap*p/100)} guests<em>{LEVELS[p]}</em></span>"
         for p in LEVELS)
@@ -204,23 +232,29 @@ def main():
     by_h = defaultdict(list)
     for ts, cur, _, _ in rows:
         by_h[ts.hour].append((cur, 100 * cur / cap))
-    PW, PH, PL, PR = 1000, 220, 104, 2  # left edge matches the heatmap tile area
-    cw = (PW - PL - PR) / (x1 - x0)
-    py = lambda c: 10 + (1 - c / ymax) * (PH - 10 - 30)
-    ps = [f'<svg viewBox="0 0 {PW} {PH}" class="chart" role="img" aria-label="Typical day">']
-    for p in (0, 25, 50, 75, 100):
-        y = py(cap * p / 100)
-        ps.append(f'<line class="grid" x1="{PL}" x2="{PW-PR}" y1="{y:.1f}" y2="{y:.1f}"/>'
-                  f'<text x="0" y="{y+4:.1f}">{p}% - {round(cap*p/100)}</text>')
-    for k, h in enumerate(range(x0, x1)):
-        ps.append(f'<text x="{PL+(k+0.5)*cw:.1f}" y="{PH-8}" text-anchor="middle">{h:02d}</text>')
-        v = by_h.get(h)
-        if v:
-            avg = mean([c for c, _ in v])
-            tip = f"{h:02d}:00 - avg {avg:.0f} guests - {mean([p for _, p in v]):.0f}% - {len(v)} sample(s)"
-            ps.append(f'<rect class="col" rx="3" x="{PL+k*cw+1:.1f}" y="{py(avg):.1f}" width="{cw-2:.1f}" '
-                      f'height="{PH-30-py(avg):.1f}"><title>{tip}</title></rect>')
-    ps.append("</svg>")
+    def typical_svg(PW, PH, PL, cls, step=1):
+        PR = 2
+        cw = (PW - PL - PR) / (x1 - x0)
+        py = lambda c: 10 + (1 - c / ymax) * (PH - 10 - 30)
+        o = [f'<svg viewBox="0 0 {PW} {PH}" class="chart {cls}" role="img" aria-label="Typical day">']
+        for p in (0, 25, 50, 75, 100):
+            y = py(cap * p / 100)
+            o.append(f'<line class="grid" x1="{PL}" x2="{PW-PR}" y1="{y:.1f}" y2="{y:.1f}"/>'
+                     f'<text x="0" y="{y+4:.1f}"><tspan class="pc">{p}% - </tspan>{round(cap*p/100)}</text>')
+        for k, h in enumerate(range(x0, x1)):
+            if k % step == 0:
+                o.append(f'<text x="{PL+(k+0.5)*cw:.1f}" y="{PH-8}" text-anchor="middle">{h:02d}</text>')
+            v = by_h.get(h)
+            if v:
+                avg = mean([c for c, _ in v])
+                tip = f"{h:02d}:00 - avg {avg:.0f} guests - {mean([p for _, p in v]):.0f}% - {len(v)} sample(s)"
+                o.append(f'<rect class="col" rx="3" x="{PL+k*cw+1:.1f}" y="{py(avg):.1f}" width="{cw-2:.1f}" '
+                         f'height="{PH-30-py(avg):.1f}"><title>{tip}</title></rect>')
+        o.append("</svg>")
+        return "".join(o)
+
+    # wide screens: aligned with the heatmap columns; phones: a taller, simpler version
+    ps = [typical_svg(1000, 220, 104, "p pd"), typical_svg(420, 260, 34, "p pm", step=2)]
 
     # ---------- 3. best time (preview) ----------
     wh = defaultdict(list)  # (weekday, hour) -> [pct]
@@ -283,7 +317,8 @@ def main():
 {live}
 
 <h2>Last {a.days} days <small>average occupancy per hour, in %</small></h2>
-<div class="wrap">{''.join(t)}</div>
+<div class="wrap hm-d">{''.join(t)}</div>
+<div class="hm-m">{''.join(mt)}</div>
 <div class="key">{key}</div>
 <p class="leg">Light = empty, dark blue = full, red = over capacity, grey = no sample. A 0 can mean empty or closed.</p>
 {city_note}
