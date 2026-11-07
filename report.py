@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+FULL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 LEVELS = {0: "empty", 25: "quiet", 50: "busy", 75: "full", 100: "at capacity"}
 OPEN_FROM, OPEN_TO = 6, 22  # opening hours (Zurich time)
 
@@ -229,9 +230,16 @@ def main():
         f"<span class='k'><i style='background:{colour(p)[0]}'></i><b>{p}%</b> = {round(cap*p/100)} guests<em>{LEVELS[p]}</em></span>"
         for p in LEVELS)
 
+    # typical day = only the same weekday as today (e.g. all Saturdays), so each day shows its own pattern
+    wd_today = last_ts.weekday()
+    wd_dates = {r[0].date() for r in rows if r[0].weekday() == wd_today}
     by_h = defaultdict(list)
     for ts, cur, _, _ in rows:
-        by_h[ts.hour].append((cur, 100 * cur / cap))
+        if ts.weekday() == wd_today:
+            by_h[ts.hour].append((cur, 100 * cur / cap))
+    typ_title = f"Typical {FULL_DAYS[wd_today]}"
+    typ_sub = (f"average of {len(wd_dates)} {FULL_DAYS[wd_today]}s" if len(wd_dates) > 1
+               else f"only today so far - each new {FULL_DAYS[wd_today]} refines it")
     def typical_svg(PW, PH, PL, cls, step=1):
         PR = 2
         cw = (PW - PL - PR) / (x1 - x0)
@@ -322,7 +330,7 @@ def main():
 <div class="key">{key}</div>
 <p class="leg">Light = empty, dark blue = full, red = over capacity, grey = no sample. A 0 can mean empty or closed.</p>
 {city_note}
-<h2>Typical day <small>average of all samples</small></h2>
+<h2>{typ_title} <small>{typ_sub}</small></h2>
 {''.join(ps)}
 
 <h2>Best time to go <small>preview</small></h2>
