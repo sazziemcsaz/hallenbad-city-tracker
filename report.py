@@ -155,8 +155,9 @@ def main():
     for h in range(x0, x1 + 1, 2):  # x axis: every 2 hours
         sv.append(f'<text x="{X(h):.1f}" y="{H-6}" text-anchor="middle">{h:02d}</text>')
     by_hour_other = defaultdict(list)
-    for ts, cur, _, _ in other:
-        by_hour_other[ts.hour].append(cur)
+    for ts, cur, _, _ in other:  # only earlier days with the same weekday as today
+        if ts.weekday() == last_ts.weekday():
+            by_hour_other[ts.hour].append(cur)
     typical = [(h + 0.5, mean(v)) for h, v in sorted(by_hour_other.items())]
     if len(typical) >= 2:
         sv.append('<polyline class="ty" points="' + " ".join(f"{X(t):.1f},{Y(c):.1f}" for t, c in typical) + '"/>')
@@ -176,7 +177,7 @@ def main():
     sv.append(f'<circle class="pt now" r="5" cx="{X(now_t):.1f}" cy="{Y(now_c):.1f}"/>'
               f'<text class="hv nowl" x="{min(X(now_t), W - R - 14):.1f}" y="{yy:.1f}" text-anchor="middle">{now_c}</text>')
     sv.append("</svg>")
-    typ_leg = '<span><i class="d"></i>typical</span>' if len(typical) >= 2 else ""
+    typ_leg = f'<span><i class="d"></i>typical {FULL_DAYS[last_ts.weekday()]}</span>' if len(typical) >= 2 else ""
 
     peak = max(today, key=lambda r: r[1])
     low = min(today, key=lambda r: r[1])
