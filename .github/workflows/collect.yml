@@ -6,7 +6,7 @@ name: collect
 # Take one sample, rebuild the report, commit both back to the repo.
 on:
   schedule:
-    - cron: "*/10 4-21 * * *"
+    - cron: "3,13,23,33,43,53 4-21 * * *" # off-peak minutes: GitHub drops many runs at :00/:10/:20
   workflow_dispatch: # lets you run it by hand from the Actions tab
 
 permissions:
