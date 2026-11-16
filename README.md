@@ -16,7 +16,11 @@ project samples it every 10 minutes during opening hours and builds the history 
 
 ## How it works
 
-1. A scheduled GitHub Action ([`collect.yml`](.github/workflows/collect.yml)) runs every 10 minutes while the pool is open (06:00–22:00 Zürich time).
+1. A GitHub Action ([`collect-loop.yml`](.github/workflows/collect-loop.yml)) starts every hour. Each job stays alive for up to
+   5h45m and takes a sample every 10 minutes while the pool is open (06:00–22:00 Zürich time), via
+   [`collect_loop.py`](collect_loop.py). It is one long job rather than many short scheduled runs because GitHub's
+   cron skips many runs; the hourly start only keeps the chain going. [`collect.yml`](.github/workflows/collect.yml)
+   takes a single sample on demand.
 2. [`collect.py`](collect.py) reads the live occupancy from the same public WebSocket feed the city's page uses
    (`wss://badi-public.crowdmonitor.ch:9591/api`) and appends one row to [`occupancy.csv`](occupancy.csv).
 3. [`report.py`](report.py) turns the CSV into `index.html`, which GitHub Pages serves.
@@ -27,7 +31,7 @@ Both scripts use only the Python standard library.
 
 - The feed is not an official, documented API and could change or disappear.
 - A value of 0 can mean "empty" or "closed"; the feed doesn't say which.
-- GitHub's scheduler can start runs a few minutes late, so samples aren't exactly 10 minutes apart.
+- Samples are taken about every 10 minutes; a dropped or delayed GitHub job can still leave gaps.
 
 ## Run it yourself
 

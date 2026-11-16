@@ -1,13 +1,11 @@
 name: collect
 
-# Every 10 minutes while the pool is open (06:00-22:00 Zürich time).
-# GitHub cron runs in UTC and Zürich is UTC+1/+2, so the cron window below is
-# deliberately a bit wide (04-21 UTC); collect.py --open-hours does the exact check.
+# Manual one-off sample: run it by hand from the Actions tab to take a single sample right now.
+# The regular every-10-minutes collection is done by collect-loop.yml (one long job), which
+# replaced this workflow's schedule because GitHub's cron dropped most of its runs.
 # Take one sample, rebuild the report, commit both back to the repo.
 on:
-  schedule:
-    - cron: "3,13,23,33,43,53 4-21 * * *" # off-peak minutes: GitHub drops many runs at :00/:10/:20
-  workflow_dispatch: # lets you run it by hand from the Actions tab
+  workflow_dispatch:
 
 permissions:
   contents: write # needed so the job can push the new CSV row
