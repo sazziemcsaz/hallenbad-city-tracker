@@ -23,6 +23,7 @@ INTERVAL = int(os.environ.get("LOOP_INTERVAL", 600))
 MAX_SECONDS = int(os.environ.get("LOOP_MAX_SECONDS", 5 * 3600 + 45 * 60))
 REMOTE = os.environ.get("LOOP_REMOTE", "origin")
 BRANCH = os.environ.get("LOOP_BRANCH", "main")
+HANDOVER_LEAD = 20 * 60  # start the successor this long before our budget ends
 OPEN_FROM, OPEN_TO = 6, 22  # Zürich hours; the 22:00 sample is still taken
 ZH = ZoneInfo("Europe/Zurich")
 
@@ -59,20 +60,30 @@ def save_sample():
     return False
 
 
+def hand_over():
+    """Start the next job ourselves. GitHub's cron is too unreliable to carry the chain.
+    A workflow_dispatch started with the job's own token is allowed (unlike push/schedule events);
+    `concurrency` then holds the new job in the queue until this one ends."""
+    if not os.environ.get("GH_TOKEN"):
+        return False  # not on GitHub (e.g. local test)
+    r = sh("gh", "workflow", "run", "collect-loop.yml", "--ref", BRANCH)
+    print("hand-over:", (r.stdout.strip() or r.stderr.strip())[:200], flush=True)
+    return r.returncode == 0
+
+
 def main():
     start = time.time()
+    handed = False
     while True:
         m = zurich_minutes()
-        if m > OPEN_TO * 60:
-            print("pool closed for the day, stopping", flush=True)
-            return
-        if m < OPEN_FROM * 60:  # started early: wait for opening (in short naps)
-            time.sleep(min((OPEN_FROM * 60 - m) * 60, 300))
-            continue
-        save_sample()
+        if OPEN_FROM * 60 <= m <= OPEN_TO * 60:
+            save_sample()
+        # closed hours: no sampling, the job just idles so the chain never has to be restarted
+        if not handed and time.time() - start > MAX_SECONDS - HANDOVER_LEAD:
+            handed = hand_over()
         nxt = (time.time() // INTERVAL + 1) * INTERVAL  # next :00/:10/:20... mark
         if nxt - start > MAX_SECONDS:
-            print("time budget used up, handing over to the next job", flush=True)
+            print("time budget used up, the next job takes over", flush=True)
             return
         time.sleep(max(0, nxt - time.time()))
 
