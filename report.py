@@ -44,6 +44,12 @@ def mean(v):
     return sum(v) / len(v)
 
 
+def median(v):
+    v = sorted(v)
+    n = len(v)
+    return v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2
+
+
 CSS = """
 :root{--bg:#fff;--fg:#1a2530;--mut:#6b7885;--none:#eceff2;--card:#f4f6f8;--line:hsl(210 75% 50%);--warn:#b7791f;--ov:#d9730d}
 @media(prefers-color-scheme:dark){:root{--bg:#12171c;--fg:#e4e9ee;--mut:#8c98a4;--none:#222a31;--card:#1a2128;--warn:#e0a63a;--ov:#f0a24a}}
@@ -59,7 +65,7 @@ h2{font-size:16px;margin:36px 0 10px}h2 small{font-weight:400;color:var(--mut);f
 .meter{height:8px;border-radius:4px;background:var(--none)}.meter i{display:block;height:8px;border-radius:4px;background:var(--line)}
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px}
 .stat b{display:block;font-weight:500;font-size:16px;margin-top:2px}
-.stat small{display:block;color:var(--mut);font-size:13px;margin-top:2px}.stat.warn{outline:1.5px solid var(--warn)}.stat.warn #ago::after{content:" - delayed";color:var(--warn)}
+.hero .vs{margin-bottom:8px;color:var(--fg)}.stat small{display:block;color:var(--mut);font-size:13px;margin-top:2px}.stat.warn{outline:1.5px solid var(--warn)}.stat.warn #ago::after{content:" - delayed";color:var(--warn)}
 .lg{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-bottom:4px}
 .lg i{display:inline-block;width:14px;height:0;border-top:2px solid var(--line);vertical-align:middle;margin-right:5px}
 .lg i.d{border-top:2px dashed var(--mut)}.lg i.y{border-top:3px dotted var(--ov)}.lg i.a{border-top:3px solid var(--ov)}
@@ -163,7 +169,7 @@ def main():
     for ts, cur, _, _ in other:  # only earlier days with the same weekday as today
         if ts.weekday() == last_ts.weekday():
             by_hour_other[ts.hour].append(cur)
-    typical = [(h + 0.5, mean(v)) for h, v in sorted(by_hour_other.items())]
+    typical = [(h + 0.5, median(v)) for h, v in sorted(by_hour_other.items())]
     if len(typical) >= 2:
         sv.append('<polyline class="ty" points="' + " ".join(f"{X(t):.1f},{Y(c):.1f}" for t, c in typical) + '"/>')
     if len(yest) >= 2:  # yesterday's actual curve, dotted
@@ -187,6 +193,18 @@ def main():
     typ_leg = f'<span><i class="d"></i>typical {FULL_DAYS[last_ts.weekday()]}</span>' if len(typical) >= 2 else ""
 
     yes_leg = f'<span><i class="y"></i>yesterday ({DAYS[yday.weekday()]})</span>' if len(yest) >= 2 else ""
+    # compare with a usual same weekday at this time of day (median of samples within 15 min)
+    tod = last_ts.hour * 60 + last_ts.minute
+    near = [r[1] for r in other if r[0].weekday() == last_ts.weekday()
+            and abs(r[0].hour * 60 + r[0].minute - tod) <= 15]
+    if len(near) >= 3:
+        diff = last_cur - round(median(near))
+        what = f"a usual {FULL_DAYS[last_ts.weekday()]} at {last_ts:%H:%M}"
+        vs = (f"in line with {what}" if abs(diff) < max(5, 0.05 * cap)
+              else f"{abs(diff)} {'above' if diff > 0 else 'below'} {what}")
+        vs_html = f'<div class="mut vs">{vs}</div>'
+    else:
+        vs_html = ""
     peak = max(today, key=lambda r: r[1])
     low = min(today, key=lambda r: r[1])
     after8 = [r for r in today if r[0].hour >= 8]
@@ -199,6 +217,7 @@ def main():
     <div class="big">{last_cur}</div>
     <div>
       <div class="mut" style="margin-bottom:6px">guests - {last_pct:.0f}% of {cap} - {word(last_pct)}</div>
+      {vs_html}
       <div class="meter"><i style="width:{min(100,last_pct):.0f}%"></i></div>
     </div>
   </div>
@@ -253,7 +272,7 @@ def main():
     for ts, cur, _, _ in rows:
         by_all[ts.hour].append(cur)
     typ_title = f"Typical {FULL_DAYS[wd_today]}"
-    typ_sub = (f"average of {len(wd_dates)} {FULL_DAYS[wd_today]}s" if len(wd_dates) > 1
+    typ_sub = (f"median of {len(wd_dates)} {FULL_DAYS[wd_today]}s" if len(wd_dates) > 1
                else f"only today so far - each new {FULL_DAYS[wd_today]} refines it")
     def typical_svg(PW, PH, PL, cls, step=1):
         PR = 2
@@ -269,8 +288,8 @@ def main():
                 o.append(f'<text x="{PL+(k+0.5)*cw:.1f}" y="{PH-8}" text-anchor="middle">{h:02d}</text>')
             v = by_h.get(h)
             if v:
-                avg = mean([c for c, _ in v])
-                tip = f"{h:02d}:00 - avg {avg:.0f} guests - {mean([p for _, p in v]):.0f}% - {len(v)} sample(s)"
+                avg = median([c for c, _ in v])
+                tip = f"{h:02d}:00 - typical {avg:.0f} guests - {mean([p for _, p in v]):.0f}% - {len(v)} sample(s)"
                 o.append(f'<rect class="col" rx="3" x="{PL+k*cw+1:.1f}" y="{py(avg):.1f}" width="{cw-2:.1f}" '
                          f'height="{PH-30-py(avg):.1f}"><title>{tip}</title></rect>')
         ap = [(PL + (k + 0.5) * cw, mean(by_all[h]), h) for k, h in enumerate(range(x0, x1)) if by_all.get(h)]
@@ -285,25 +304,33 @@ def main():
     ps = [typical_svg(1000, 220, 104, "p pd"), typical_svg(420, 260, 34, "p pm", step=2)]
 
     # ---------- 3. best time (preview) ----------
-    wh = defaultdict(list)  # (weekday, hour) -> [pct]
+    wh = defaultdict(list)  # (weekday, hour) -> [pct]  (medians below)
     for ts, cur, _, _ in rows:
         wh[(ts.weekday(), ts.hour)].append(100 * cur / cap)
     wh_other = defaultdict(list)
     for ts, cur, _, _ in other:
         wh_other[(ts.weekday(), ts.hour)].append(100 * cur / cap)
     tip = "Not enough data for a forecast yet."
-    for h in range(last_ts.hour + 1, OPEN_TO):
-        v = wh_other.get((last_ts.weekday(), h))
-        if v and mean(v) <= last_pct - 10:
-            tip = f"On {DAYS[last_ts.weekday()]}s it's usually quieter from {h:02d}:00 (around {mean(v):.0f}%)."
-            break
+    # quietest two-hour slot still ahead today, from what this weekday usually looks like
+    first = max(BEST_FROM, last_ts.hour + 1)
+    ahead = []
+    for sh in range(first, OPEN_TO - 1):
+        p1, p2 = wh_other.get((last_ts.weekday(), sh)), wh_other.get((last_ts.weekday(), sh + 1))
+        if p1 and p2:
+            ahead.append((sh, (median(p1) + median(p2)) / 2))
+    if ahead:
+        sh, m = min(ahead, key=lambda a: a[1])
+        tip = (f"Best slot still ahead today: <b>{sh:02d}-{sh+2:02d}h</b>, usually around {m:.0f}% "
+               f"({round(cap*m/100)} guests) on a {FULL_DAYS[last_ts.weekday()]}.")
+    elif last_ts.hour >= OPEN_TO - 2:
+        tip = "Nothing left today - the pool closes at 22:00."
     wins = []
     for wd in range(7):
         best = None
         for s in range(BEST_FROM, OPEN_TO - 1):
             p1, p2 = wh.get((wd, s)), wh.get((wd, s + 1))
             if p1 and p2:
-                m = (mean(p1) + mean(p2)) / 2
+                m = (median(p1) + median(p2)) / 2
                 if best is None or m < best[1]:
                     best = (s, m)
         wins.append(best)
@@ -324,9 +351,9 @@ def main():
 <div class="note">Preview: based on {n_days} day{'s' if n_days != 1 else ''} of data. It only becomes meaningful after a few weeks.</div>
 <div class="card">
   <div class="verdict">
-    <div><div class="t">Right now it's {word(last_pct)} ({last_pct:.0f}%)</div><div class="mut">{tip}</div></div>
+    <div><div class="t">{tip}</div><div class="mut">Right now it's {word(last_pct)} ({last_pct:.0f}%).</div></div>
   </div>
-  <div class="mut">Quietest two hours per weekday from 08:00 (average of all samples)</div>
+  <div class="mut">Quietest two hours per weekday from 08:00 (typical = median of all samples)</div>
   <div class="best">{''.join(rows_html)}</div>
 </div>"""
 
