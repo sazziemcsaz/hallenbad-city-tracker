@@ -16,6 +16,7 @@ DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 FULL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 LEVELS = {0: "empty", 25: "quiet", 50: "busy", 75: "full", 100: "at capacity"}
 OPEN_FROM, OPEN_TO = 6, 22  # opening hours (Zurich time)
+BEST_FROM = 8  # 'best time' only looks at 08:00 onwards (06:00 is quiet but not realistic)
 
 
 def load(path):
@@ -44,8 +45,8 @@ def mean(v):
 
 
 CSS = """
-:root{--bg:#fff;--fg:#1a2530;--mut:#6b7885;--none:#eceff2;--card:#f4f6f8;--line:hsl(210 75% 50%);--warn:#b7791f}
-@media(prefers-color-scheme:dark){:root{--bg:#12171c;--fg:#e4e9ee;--mut:#8c98a4;--none:#222a31;--card:#1a2128;--warn:#e0a63a}}
+:root{--bg:#fff;--fg:#1a2530;--mut:#6b7885;--none:#eceff2;--card:#f4f6f8;--line:hsl(210 75% 50%);--warn:#b7791f;--ov:#d9730d}
+@media(prefers-color-scheme:dark){:root{--bg:#12171c;--fg:#e4e9ee;--mut:#8c98a4;--none:#222a31;--card:#1a2128;--warn:#e0a63a;--ov:#f0a24a}}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font:15px system-ui,sans-serif;margin:0 auto;padding:24px 16px 48px;max-width:1000px}
 h1{font-size:22px;margin:0 0 4px}p.s{color:var(--mut);margin:0 0 24px}
@@ -58,10 +59,10 @@ h2{font-size:16px;margin:36px 0 10px}h2 small{font-weight:400;color:var(--mut);f
 .meter{height:8px;border-radius:4px;background:var(--none)}.meter i{display:block;height:8px;border-radius:4px;background:var(--line)}
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px}
 .stat b{display:block;font-weight:500;font-size:16px;margin-top:2px}
-.stat.warn{outline:1.5px solid var(--warn)}.stat.warn #ago::after{content:" - delayed";color:var(--warn)}
+.stat small{display:block;color:var(--mut);font-size:13px;margin-top:2px}.stat.warn{outline:1.5px solid var(--warn)}.stat.warn #ago::after{content:" - delayed";color:var(--warn)}
 .lg{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-bottom:4px}
 .lg i{display:inline-block;width:14px;height:0;border-top:2px solid var(--line);vertical-align:middle;margin-right:5px}
-.lg i.d{border-top:2px dashed var(--mut)}
+.lg i.d{border-top:2px dashed var(--mut)}.lg i.y{border-top:3px dotted var(--ov)}.lg i.a{border-top:3px solid var(--ov)}
 .wrap{overflow-x:auto}
 table{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:2px;font-variant-numeric:tabular-nums}
 th{font-weight:500;font-size:12px;color:var(--mut);padding:2px 4px}th.d{width:100px;text-align:left;white-space:nowrap;padding:2px 0}
@@ -74,6 +75,8 @@ td{height:30px;text-align:center;font-size:12px;border-radius:4px}td.none{backgr
 .chart .grid{stroke:var(--none);stroke-width:1}
 .chart .ln{fill:none;stroke:var(--line);stroke-width:2.5;stroke-linejoin:round}
 .chart .ty{fill:none;stroke:var(--mut);stroke-width:1.5;stroke-dasharray:4 3}
+.chart .yd{fill:none;stroke:var(--ov);stroke-width:2.5;stroke-linecap:round;stroke-dasharray:.1 5.5}
+.chart .av{fill:none;stroke:var(--ov);stroke-width:2.5;stroke-linejoin:round}.chart .avp{fill:var(--ov);stroke:var(--bg);stroke-width:1.5}
 .chart .pt{fill:var(--line);stroke:var(--bg);stroke-width:1.5}.chart .col{fill:var(--line)}
 .chart .hv{fill:var(--fg);font-size:9px}.chart .nowl{font-size:11px;font-weight:500;fill:var(--line)}
 .chart .pt.now{stroke:var(--line);stroke-width:2;fill:var(--bg)}
@@ -137,13 +140,15 @@ def main():
         if ts.date() >= first_day:
             cells[(ts.date(), ts.hour)].append((cur, mx))
     used = [h for (_, h) in cells]
-    hours = range(min(OPEN_FROM, *used), max(OPEN_TO, *used) + 1) if used else range(OPEN_FROM, OPEN_TO + 1)
+    hours = range(min(OPEN_FROM, *used), OPEN_TO) if used else range(OPEN_FROM, OPEN_TO)  # 22:00 = closing, no column
     x0, x1 = hours.start, hours.stop
 
     # ---------- 1. live now ----------
     today = [r for r in rows if r[0].date() == last_ts.date()]
     other = [r for r in rows if r[0].date() != last_ts.date()]
-    ymax = max(cap, max(r[1] for r in today))
+    yday = last_ts.date() - timedelta(days=1)
+    yest = [r for r in other if r[0].date() == yday]
+    ymax = max(cap, max(r[1] for r in today), max((r[1] for r in yest), default=0))
     W, H, L, R, T, B = 600, 220, 62, 8, 20, 24
     X = lambda t: L + (t - x0) / (x1 - x0) * (W - L - R)
     Y = lambda c: T + (1 - c / ymax) * (H - T - B)
@@ -161,6 +166,8 @@ def main():
     typical = [(h + 0.5, mean(v)) for h, v in sorted(by_hour_other.items())]
     if len(typical) >= 2:
         sv.append('<polyline class="ty" points="' + " ".join(f"{X(t):.1f},{Y(c):.1f}" for t, c in typical) + '"/>')
+    if len(yest) >= 2:  # yesterday's actual curve, dotted
+        sv.append('<polyline class="yd" points="' + " ".join(f"{X(ts.hour + ts.minute / 60):.1f},{Y(cur):.1f}" for ts, cur, _, _ in yest) + '"/>')
     pts = [(ts.hour + ts.minute / 60, cur, ts) for ts, cur, _, _ in today]
     sv.append('<polyline class="ln" points="' + " ".join(f"{X(t):.1f},{Y(c):.1f}" for t, c, _ in pts) + '"/>')
     r_dot = 3.5 if len(pts) <= 30 else 2
@@ -179,8 +186,12 @@ def main():
     sv.append("</svg>")
     typ_leg = f'<span><i class="d"></i>typical {FULL_DAYS[last_ts.weekday()]}</span>' if len(typical) >= 2 else ""
 
+    yes_leg = f'<span><i class="y"></i>yesterday ({DAYS[yday.weekday()]})</span>' if len(yest) >= 2 else ""
     peak = max(today, key=lambda r: r[1])
     low = min(today, key=lambda r: r[1])
+    after8 = [r for r in today if r[0].hour >= 8]
+    low8 = min(after8, key=lambda r: r[1]) if after8 else None
+    low8_html = f'<small>from 08:00: {low8[0]:%H:%M} - {low8[1]} guests</small>' if low8 else '<small>from 08:00: not yet</small>'
     live = f"""
 <div class="live">
   <div class="card hero">
@@ -194,14 +205,14 @@ def main():
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:baseline">
       <b style="font-weight:500">Today, {DAYS[last_ts.weekday()]} {last_ts:%d %b}</b>
-      <span class="lg"><span><i></i>today</span>{typ_leg}</span>
+      <span class="lg"><span><i></i>today</span>{typ_leg}{yes_leg}</span>
     </div>
     {''.join(sv)}
   </div>
 </div>
 <div class="stats">
   <div class="card stat"><span class="mut">Peak today</span><b>{peak[0]:%H:%M} - {peak[1]} guests</b></div>
-  <div class="card stat"><span class="mut">Quietest so far today</span><b>{low[0]:%H:%M} - {low[1]} guests</b></div>
+  <div class="card stat"><span class="mut">Quietest so far today</span><b>{low[0]:%H:%M} - {low[1]} guests</b>{low8_html}</div>
   <div class="card stat"><span class="mut">Last sample</span><b id="ago" data-ts="{last_ts.isoformat()}">{last_ts:%H:%M}</b></div>
 </div>"""
 
@@ -238,6 +249,9 @@ def main():
     for ts, cur, _, _ in rows:
         if ts.weekday() == wd_today:
             by_h[ts.hour].append((cur, 100 * cur / cap))
+    by_all = defaultdict(list)
+    for ts, cur, _, _ in rows:
+        by_all[ts.hour].append(cur)
     typ_title = f"Typical {FULL_DAYS[wd_today]}"
     typ_sub = (f"average of {len(wd_dates)} {FULL_DAYS[wd_today]}s" if len(wd_dates) > 1
                else f"only today so far - each new {FULL_DAYS[wd_today]} refines it")
@@ -259,6 +273,11 @@ def main():
                 tip = f"{h:02d}:00 - avg {avg:.0f} guests - {mean([p for _, p in v]):.0f}% - {len(v)} sample(s)"
                 o.append(f'<rect class="col" rx="3" x="{PL+k*cw+1:.1f}" y="{py(avg):.1f}" width="{cw-2:.1f}" '
                          f'height="{PH-30-py(avg):.1f}"><title>{tip}</title></rect>')
+        ap = [(PL + (k + 0.5) * cw, mean(by_all[h]), h) for k, h in enumerate(range(x0, x1)) if by_all.get(h)]
+        if len(ap) >= 2:  # overlay: average of all days
+            o.append('<polyline class="av" points="' + " ".join(f"{x:.1f},{py(c):.1f}" for x, c, _ in ap) + '"/>')
+            for x, c, h in ap:
+                o.append(f'<circle class="avp" r="3" cx="{x:.1f}" cy="{py(c):.1f}"><title>{h:02d}:00 - all days avg {c:.0f} guests</title></circle>')
         o.append("</svg>")
         return "".join(o)
 
@@ -281,7 +300,7 @@ def main():
     wins = []
     for wd in range(7):
         best = None
-        for s in range(OPEN_FROM, OPEN_TO - 1):
+        for s in range(BEST_FROM, OPEN_TO - 1):
             p1, p2 = wh.get((wd, s)), wh.get((wd, s + 1))
             if p1 and p2:
                 m = (mean(p1) + mean(p2)) / 2
@@ -307,7 +326,7 @@ def main():
   <div class="verdict">
     <div><div class="t">Right now it's {word(last_pct)} ({last_pct:.0f}%)</div><div class="mut">{tip}</div></div>
   </div>
-  <div class="mut">Quietest two hours per weekday (average of all samples)</div>
+  <div class="mut">Quietest two hours per weekday from 08:00 (average of all samples)</div>
   <div class="best">{''.join(rows_html)}</div>
 </div>"""
 
@@ -332,6 +351,7 @@ def main():
 <p class="leg">Light = empty, dark blue = full, red = over capacity, grey = no sample. A 0 can mean empty or closed.</p>
 {city_note}
 <h2>{typ_title} <small>{typ_sub}</small></h2>
+<div class="lg"><span><i class="a"></i>average of all days</span><span class="mut">bars = {FULL_DAYS[wd_today]}s only</span></div>
 {''.join(ps)}
 
 <h2>Best time to go <small>preview</small></h2>
