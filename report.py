@@ -65,7 +65,7 @@ h2{font-size:16px;margin:36px 0 10px}h2 small{font-weight:400;color:var(--mut);f
 .meter{height:8px;border-radius:4px;background:var(--none)}.meter i{display:block;height:8px;border-radius:4px;background:var(--line)}
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px}
 .stat b{display:block;font-weight:500;font-size:16px;margin-top:2px}
-.hero .vs{margin-bottom:8px;color:var(--fg)}.stat small{display:block;color:var(--mut);font-size:13px;margin-top:2px}.stat.warn{outline:1.5px solid var(--warn)}.stat.warn #ago::after{content:" - delayed";color:var(--warn)}
+.stat .bt{color:var(--fg);font-weight:500}.hero .vs{margin-bottom:8px;color:var(--fg)}.stat small{display:block;color:var(--mut);font-size:13px;margin-top:2px}.stat.warn{outline:1.5px solid var(--warn)}.stat.warn #ago::after{content:" - delayed";color:var(--warn)}
 .lg{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-bottom:4px}
 .lg i{display:inline-block;width:14px;height:0;border-top:2px solid var(--line);vertical-align:middle;margin-right:5px}
 .lg i.d{border-top:2px dashed var(--mut)}.lg i.y{border-top:3px dotted var(--ov)}.lg i.a{border-top:3px solid var(--ov)}
@@ -207,9 +207,22 @@ def main():
         vs_html = ""
     peak = max(today, key=lambda r: r[1])
     low = min(today, key=lambda r: r[1])
-    after8 = [r for r in today if r[0].hour >= 8]
-    low8 = min(after8, key=lambda r: r[1]) if after8 else None
-    low8_html = f'<small>from 08:00: {low8[0]:%H:%M} - {low8[1]} guests</small>' if low8 else '<small>from 08:00: not yet</small>'
+    # quietest two-hour slot still ahead today (from 08:00), from what this weekday usually looks like
+    wh_early = defaultdict(list)
+    for ts, cur, _, _ in other:
+        wh_early[(ts.weekday(), ts.hour)].append(100 * cur / cap)
+    ahead = []
+    for sh in range(max(BEST_FROM, last_ts.hour + 1), OPEN_TO - 1):
+        p1, p2 = wh_early.get((last_ts.weekday(), sh)), wh_early.get((last_ts.weekday(), sh + 1))
+        if p1 and p2:
+            ahead.append((sh, (median(p1) + median(p2)) / 2))
+    best_ahead = min(ahead, key=lambda a: a[1]) if ahead else None
+    if best_ahead:
+        low8_html = f'<small>Best time to go: <span class="bt">{best_ahead[0]:02d}-{best_ahead[0]+2:02d}h</span> (usually ~{best_ahead[1]:.0f}%)</small>'
+    elif last_ts.hour >= OPEN_TO - 2:
+        low8_html = '<small>Best time to go: nothing left today</small>'
+    else:
+        low8_html = '<small>Best time to go: not enough data yet</small>'
     live = f"""
 <div class="live">
   <div class="card hero">
@@ -311,15 +324,8 @@ def main():
     for ts, cur, _, _ in other:
         wh_other[(ts.weekday(), ts.hour)].append(100 * cur / cap)
     tip = "Not enough data for a forecast yet."
-    # quietest two-hour slot still ahead today, from what this weekday usually looks like
-    first = max(BEST_FROM, last_ts.hour + 1)
-    ahead = []
-    for sh in range(first, OPEN_TO - 1):
-        p1, p2 = wh_other.get((last_ts.weekday(), sh)), wh_other.get((last_ts.weekday(), sh + 1))
-        if p1 and p2:
-            ahead.append((sh, (median(p1) + median(p2)) / 2))
-    if ahead:
-        sh, m = min(ahead, key=lambda a: a[1])
+    if best_ahead:
+        sh, m = best_ahead
         tip = (f"Best slot still ahead today: <b>{sh:02d}-{sh+2:02d}h</b>, usually around {m:.0f}% "
                f"({round(cap*m/100)} guests) on a {FULL_DAYS[last_ts.weekday()]}.")
     elif last_ts.hour >= OPEN_TO - 2:
