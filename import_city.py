@@ -45,11 +45,13 @@ def main():
         added += key not in rows
         rows[key] = [key, "OD-SENSOR", "Hallenbad City", cur, args.cap, round(100 * cur / args.cap, 1)]
 
-    with open(args.out, "w", newline="") as f:
+    tmp = args.out + ".tmp"  # write a copy and swap it in, so an interrupted run can't lose history
+    with open(tmp, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(FIELDS)
         for k in sorted(rows):
             w.writerow(rows[k])
+    os.replace(tmp, args.out)
     print(f"{len(rows)} rows in {args.out} ({added} new)")
 
 

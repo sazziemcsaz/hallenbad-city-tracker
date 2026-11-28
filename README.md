@@ -25,7 +25,11 @@ project samples it every 10 minutes during opening hours and builds the history 
    (`wss://badi-public.crowdmonitor.ch:9591/api`) and appends one row to [`occupancy.csv`](occupancy.csv).
 3. [`report.py`](report.py) turns the CSV into `index.html`, which GitHub Pages serves.
 
-Both scripts use only the Python standard library.
+4. Once a day the collector also runs [`import_city.py`](import_city.py), which saves the city's open sensor data to
+   [`backfill_city.csv`](backfill_city.csv). The report uses it to fill gaps in our own samples (outlined in the heatmap).
+   The city only publishes the last few days, so older gaps can't be filled.
+
+All scripts use only the Python standard library.
 
 ## Caveats
 

@@ -54,8 +54,20 @@ def zurich_minutes():
     return n.hour * 60 + n.minute
 
 
+imported_on = None  # date of the last city-data import this job has pushed
+
+
+def import_city_data():
+    """Once a day, pull the city's open-data series so report.py can fill our gaps.
+    The city keeps only ~5 days. A failure never costs a sample: the next round tries again."""
+    r = sh(sys.executable, "import_city.py")
+    print("city import:", (r.stdout.strip() or r.stderr.strip()[-300:]), flush=True)
+    return r.returncode == 0
+
+
 def save_sample():
     """One round. Returns True if the round finished cleanly (sample saved or nothing to save)."""
+    global imported_on
     for attempt in range(1, 5):
         sh("git", "fetch", "-q", REMOTE, BRANCH)
         sh("git", "reset", "-q", "--hard", f"{REMOTE}/{BRANCH}")
@@ -63,14 +75,18 @@ def save_sample():
         print((r.stdout.strip() or r.stderr.strip()[-300:]), flush=True)
         if r.returncode:  # feed unreachable or invalid: skip this round, try again at the next mark
             return False
+        today = datetime.now(ZH).date()
+        imported = imported_on != today and import_city_data()
         sh(sys.executable, "report.py", "--out", "index.html")
-        sh("git", "add", "occupancy.csv", "index.html")
+        sh("git", "add", "occupancy.csv", "index.html", "backfill_city.csv")
         if sh("git", "diff", "--cached", "--quiet").returncode == 0:
             return True  # nothing new (e.g. outside opening hours)
         stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
         sh("git", "commit", "-q", "-m", f"sample {stamp}")
         p = sh("git", "push", "-q", REMOTE, f"HEAD:{BRANCH}")
         if p.returncode == 0:
+            if imported:  # only now: a rejected push throws the import away with the round
+                imported_on = today
             return True
         print(f"push rejected (attempt {attempt}), redoing the round: {p.stderr.strip()[:200]}", flush=True)
         time.sleep(2 * attempt)
