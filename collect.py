@@ -40,7 +40,7 @@ def fetch_all(timeout=15):
     ).encode())
     head = b""
     while b"\r\n\r\n" not in head:
-        head += sock.recv(1)
+        head += _recv_exact(sock, 1)  # raises if the server hangs up (a bare recv would loop forever)
     if b" 101 " not in head.split(b"\r\n")[0]:
         raise ConnectionError("handshake failed: " + head.split(b"\r\n")[0].decode())
 

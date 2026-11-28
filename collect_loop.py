@@ -14,7 +14,7 @@ Settings (environment, mainly for testing): LOOP_INTERVAL (s, default 600),
 LOOP_MAX_SECONDS (default 20700 = 5h45m, under GitHub's 6 h job limit),
 LOOP_REMOTE (origin), LOOP_BRANCH (main).
 """
-import os, subprocess, sys, time
+import os, signal, subprocess, sys, time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -23,13 +23,30 @@ INTERVAL = int(os.environ.get("LOOP_INTERVAL", 600))
 MAX_SECONDS = int(os.environ.get("LOOP_MAX_SECONDS", 5 * 3600 + 45 * 60))
 REMOTE = os.environ.get("LOOP_REMOTE", "origin")
 BRANCH = os.environ.get("LOOP_BRANCH", "main")
+STEP_TIMEOUT = 90  # no single command may stall the loop longer than this
 HANDOVER_LEAD = 20 * 60  # start the successor this long before our budget ends
 OPEN_FROM, OPEN_TO = 6, 22  # Zürich hours; the 22:00 sample is still taken
 ZH = ZoneInfo("Europe/Zurich")
 
 
-def sh(*cmd):
-    return subprocess.run(cmd, cwd=HERE, text=True, capture_output=True)
+def sh(*cmd, timeout=STEP_TIMEOUT):
+    """Run a command with a time limit. On timeout, kill its whole process group (git starts
+    helper processes that would otherwise keep us waiting) and report exit code 124."""
+    p = subprocess.Popen(cmd, cwd=HERE, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         start_new_session=True)
+    try:
+        out, err = p.communicate(timeout=timeout)
+        return subprocess.CompletedProcess(cmd, p.returncode, out, err)
+    except subprocess.TimeoutExpired:
+        os.killpg(p.pid, signal.SIGKILL)
+        p.communicate()
+        msg = f"timed out after {timeout}s: {' '.join(cmd)}"
+        print(msg, flush=True)
+        if cmd[0] == "git":  # a killed git can leave its lock behind and block every later round
+            lock = os.path.join(HERE, ".git", "index.lock")
+            if os.path.exists(lock):
+                os.remove(lock)
+        return subprocess.CompletedProcess(cmd, 124, "", msg)
 
 
 def zurich_minutes():
