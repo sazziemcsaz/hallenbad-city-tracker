@@ -6,9 +6,15 @@ name: collect
 # Take one sample, rebuild the report, commit both back to the repo.
 on:
   workflow_dispatch:
+    inputs:
+      test_alert:
+        description: Only send a test alert (opens an issue that mentions you)
+        type: boolean
+        default: false
 
 permissions:
   contents: write # needed so the job can push the new CSV row
+  issues: write # needed for the test alert
 
 concurrency:
   group: collect
@@ -18,12 +24,20 @@ jobs:
   collect:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - name: Send a test alert
+        if: inputs.test_alert
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -u collect_loop.py --test-alert
       - name: Take a sample
+        if: ${{ !inputs.test_alert }}
         run: python3 collect.py --open-hours 6-22
       - name: Rebuild the report
+        if: ${{ !inputs.test_alert }}
         run: python3 report.py --out index.html
       - name: Save to the repo
+        if: ${{ !inputs.test_alert }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

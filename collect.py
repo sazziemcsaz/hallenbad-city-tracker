@@ -94,7 +94,14 @@ def main():
     now = now_dt.isoformat(timespec="seconds")
     row = [now, pool["uid"], pool["name"], int(cur), int(mx), round(100 * cur / mx, 1)]
     new = not os.path.exists(args.out)
+    cut_off = False  # a half-written last line must not swallow the new row
+    if not new and os.path.getsize(args.out):
+        with open(args.out, "rb") as f:
+            f.seek(-1, os.SEEK_END)
+            cut_off = f.read(1) != b"\n"
     with open(args.out, "a", newline="") as f:
+        if cut_off:
+            f.write("\r\n")
         w = csv.writer(f)
         if new:
             w.writerow(FIELDS)

@@ -12,6 +12,7 @@ on:
 permissions:
   contents: write # needed so the job can push the new CSV rows
   actions: write # needed so the job can start its successor (gh workflow run)
+  issues: write # needed to open (and close) an alert issue when collection keeps failing
 
 concurrency:
   group: collect-loop
@@ -22,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 355 # stay under GitHub's 6 h limit
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set commit identity
         run: |
           git config user.name "github-actions[bot]"

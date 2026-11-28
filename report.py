@@ -7,7 +7,7 @@
 
 Usage: python3 report.py [--csv occupancy.csv] [--out report.html] [--days 7]
 """
-import argparse, csv, html, os
+import argparse, csv, html, os, sys
 from bisect import bisect_left
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
@@ -17,15 +17,33 @@ DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 FULL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 LEVELS = {0: "empty", 25: "quiet", 50: "busy", 75: "full", 100: "at capacity"}
 OPEN_FROM, OPEN_TO = 6, 22  # opening hours (Zurich time)
+CLOSED_MAX, CLOSED_SPAN_H = 5, 3  # a day that never exceeds 5 guests over 3+ hours counts as closed
 BEST_FROM = 8  # 'best time' only looks at 08:00 onwards (06:00 is quiet but not realistic)
 
 
 def load(path):
     rows = []
     with open(path, newline="") as f:
-        for r in csv.DictReader(f):
-            rows.append((datetime.fromisoformat(r["timestamp"]), int(r["current"]), int(r["max"]), r["name"]))
+        for line, r in enumerate(csv.DictReader(f), start=2):
+            try:
+                ts, cur, mx = datetime.fromisoformat(r["timestamp"]), int(r["current"]), int(r["max"])
+                if ts.tzinfo is None or mx <= 0 or cur < 0 or not r["name"]:
+                    raise ValueError("incomplete or impossible values")
+            except (KeyError, TypeError, ValueError) as e:  # one damaged line must not stop the page
+                print(f"warning: skipped {os.path.basename(path)} line {line}: {e}", file=sys.stderr)
+                continue
+            rows.append((ts, cur, mx, r["name"]))
     return sorted(rows, key=lambda r: r[0])
+
+
+def closed_days(rows):
+    """Dates that look closed (holiday, maintenance): left out of 'typical' and 'best time'."""
+    by_day = defaultdict(list)
+    for ts, cur, _, _ in rows:
+        by_day[ts.date()].append((ts, cur))
+    return {d for d, v in by_day.items()
+            if max(c for _, c in v) <= CLOSED_MAX
+            and max(t for t, _ in v) - min(t for t, _ in v) >= timedelta(hours=CLOSED_SPAN_H)}
 
 
 def word(p):
@@ -106,6 +124,14 @@ table.m td{height:28px;font-size:13px}
 """
 
 AGO_JS = """
+(function(){var h=document.getElementById('dayh');if(!h)return;
+if(new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Zurich'})===h.dataset.day)return;
+// the newest data is from an earlier day (e.g. before the first sample of the morning): stop calling it today
+h.textContent=h.textContent.replace('Today, ','Latest day: ');
+var swap=[[/Peak today/,'Peak that day'],[/Quietest so far today/,'Quietest that day'],[/^today$/,'latest day'],[/^yesterday/,'day before']];
+document.querySelectorAll('.stat .mut,.lg span').forEach(function(e){var n=e.lastChild;if(!n||n.nodeType!==3)return;
+swap.forEach(function(s){n.textContent=n.textContent.replace(s[0],s[1]);});});
+document.querySelectorAll('.stat small,.verdict .t').forEach(function(e){e.style.display='none';});})();
 (function(){var el=document.getElementById('ago');if(!el)return;var t=Date.parse(el.dataset.ts);
 function up(){var m=Math.max(0,Math.round((Date.now()-t)/60000));
 el.textContent=m<1?'just now':m<60?m+' min ago':Math.floor(m/60)+' h '+(m%60)+' min ago';
@@ -162,9 +188,11 @@ def main():
 
     # ---------- 1. live now ----------
     today = [r for r in rows if r[0].date() == last_ts.date()]
-    other = [r for r in rows if r[0].date() != last_ts.date()]
+    closed = closed_days(rows)
+    usual = [r for r in rows if r[0].date() not in closed]  # what 'typical' and 'best time' learn from
+    other = [r for r in usual if r[0].date() != last_ts.date()]
     yday = last_ts.date() - timedelta(days=1)
-    yest = [r for r in other if r[0].date() == yday]
+    yest = [r for r in rows if r[0].date() == yday]
     ymax = max(cap, max(r[1] for r in today), max((r[1] for r in yest), default=0))
     W, H, L, R, T, B = 600, 220, 62, 8, 20, 24
     X = lambda t: L + (t - x0) / (x1 - x0) * (W - L - R)
@@ -247,7 +275,7 @@ def main():
   </div>
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:baseline">
-      <b style="font-weight:500">Today, {DAYS[last_ts.weekday()]} {last_ts:%d %b}</b>
+      <b style="font-weight:500" id="dayh" data-day="{last_ts.date().isoformat()}">Today, {DAYS[last_ts.weekday()]} {last_ts:%d %b}</b>
       <span class="lg"><span><i></i>today</span>{typ_leg}{yes_leg}</span>
     </div>
     {''.join(sv)}
@@ -292,13 +320,13 @@ def main():
 
     # typical day = only the same weekday as today (e.g. all Saturdays), so each day shows its own pattern
     wd_today = last_ts.weekday()
-    wd_dates = {r[0].date() for r in rows if r[0].weekday() == wd_today}
+    wd_dates = {r[0].date() for r in usual if r[0].weekday() == wd_today}
     by_h = defaultdict(list)
-    for ts, cur, _, _ in rows:
+    for ts, cur, _, _ in usual:
         if ts.weekday() == wd_today:
             by_h[ts.hour].append((cur, 100 * cur / cap))
     by_all = defaultdict(list)
-    for ts, cur, _, _ in rows:
+    for ts, cur, _, _ in usual:
         by_all[ts.hour].append(cur)
     typ_title = f"Typical {FULL_DAYS[wd_today]}"
     typ_sub = (f"median of {len(wd_dates)} {FULL_DAYS[wd_today]}s" if len(wd_dates) > 1
@@ -334,7 +362,7 @@ def main():
 
     # ---------- 3. best time (preview) ----------
     wh = defaultdict(list)  # (weekday, hour) -> [pct]  (medians below)
-    for ts, cur, _, _ in rows:
+    for ts, cur, _, _ in usual:
         wh[(ts.weekday(), ts.hour)].append(100 * cur / cap)
     wh_other = defaultdict(list)
     for ts, cur, _, _ in other:
@@ -384,6 +412,9 @@ def main():
                  f'with gaps filled from the same city series where available. Dashed outline = at least half of that hour is city data.</p>'
                  if city or filled else "")
 
+    closed_note = (f'<p class="leg">Left out of "typical" and "best time" because the pool looked closed: '
+                   f'{", ".join(f"{d:%d %b %Y}" for d in sorted(closed))}.</p>' if closed else "")
+
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{html.escape(name)} occupancy</title>
@@ -400,6 +431,7 @@ def main():
 <div class="key">{key}</div>
 <p class="leg">Light = empty, dark blue = full, red = over capacity, grey = no sample. A 0 can mean empty or closed.</p>
 {city_note}
+{closed_note}
 <h2>{typ_title} <small>{typ_sub}</small></h2>
 <div class="lg"><span><i class="a"></i>average of all days</span><span class="mut">bars = {FULL_DAYS[wd_today]}s only</span></div>
 {''.join(ps)}

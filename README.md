@@ -31,6 +31,16 @@ project samples it every 10 minutes during opening hours and builds the history 
 
 All scripts use only the Python standard library.
 
+## If something breaks
+
+- After 3 failed rounds in a row (about 30 minutes) the collector opens an issue that mentions the repo owner, and
+  closes it when rounds succeed again. The job also shows as failed once it ends. It keeps trying in the meantime.
+- This can't catch the case where no job is running at all. The page then shows its last sample as "delayed".
+- To check that alerts reach you: Actions tab, `collect`, "Run workflow", tick `test_alert`.
+- `collect_loop.py` runs `git reset --hard`, so it refuses to run outside GitHub Actions.
+- Days that look closed (never more than 5 guests over 3+ hours) are left out of "typical" and "best time".
+  Shortened holiday hours are not detected.
+
 ## Caveats
 
 - The feed is not an official, documented API and could change or disappear.
