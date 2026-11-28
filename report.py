@@ -8,7 +8,8 @@
 Usage: python3 report.py [--csv occupancy.csv] [--out report.html] [--days 7]
 """
 import argparse, csv, html, os
-from collections import defaultdict
+from bisect import bisect_left
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -72,7 +73,7 @@ h2{font-size:16px;margin:36px 0 10px}h2 small{font-weight:400;color:var(--mut);f
 .wrap{overflow-x:auto}
 table{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:2px;font-variant-numeric:tabular-nums}
 th{font-weight:500;font-size:12px;color:var(--mut);padding:2px 4px}th.d{width:100px;text-align:left;white-space:nowrap;padding:2px 0}
-td{height:30px;text-align:center;font-size:12px;border-radius:4px}td.none{background:var(--none)}
+td{height:30px;text-align:center;font-size:12px;border-radius:4px}td.none{background:var(--none)}td.city{outline:1.5px dashed currentColor;outline-offset:-3px}
 .key{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:14px;font-size:13px}
 .key .k{display:flex;align-items:center;gap:6px}.key i{width:16px;height:16px;border-radius:4px;display:inline-block}
 .key em{color:var(--mut);font-style:normal}.key em::before{content:"- "}
@@ -122,16 +123,26 @@ def main():
     ap.add_argument("--out", default=os.path.join(HERE, "report.html"))
     ap.add_argument("--days", type=int, default=7)
     ap.add_argument("--backfill", default=os.path.join(HERE, "backfill_city.csv"),
-                    help="city open-data history; used only before our own first sample")
+                    help="city open-data history; used before our own first sample and to fill gaps")
     a = ap.parse_args()
 
     own = load(a.csv)
     if not own:
         raise SystemExit("no data yet")
-    city = []
-    if os.path.exists(a.backfill):  # our own samples win from their first timestamp on
-        city = [r for r in load(a.backfill) if r[0] < own[0][0]]
-    rows = sorted(city + own, key=lambda r: r[0])
+    city, filled = [], []
+    if os.path.exists(a.backfill):
+        series = load(a.backfill)
+        own_ts = [r[0] for r in own]
+        city = [r for r in series if r[0] < own_ts[0]]  # history from before we started
+        # gaps: a city reading is used only if none of our samples is within 10 minutes of it.
+        # Never after our latest sample, so "live now" and the delay warning stay about our own data.
+        for r in series:
+            if own_ts[0] < r[0] < own_ts[-1]:
+                i = bisect_left(own_ts, r[0])
+                if min(r[0] - own_ts[i - 1], own_ts[i] - r[0]) > timedelta(minutes=10):
+                    filled.append(r)
+    rows = sorted(city + filled + own, key=lambda r: r[0])
+    filled_cells = Counter((r[0].date(), r[0].hour) for r in filled)
     name = rows[0][3]
     cap = rows[-1][2]
     last_ts, last_cur = rows[-1][0], rows[-1][1]
@@ -256,7 +267,12 @@ def main():
         pct = mean([100 * c / m for c, m in s])
         bg, fg = colour(pct)
         tip = f"{DAYS[d.weekday()]} {d:%d.%m.} {h:02d}:00 - avg {mean([c for c, _ in s]):.0f} guests - {len(s)} sample(s)"
-        return f"<td style='background:{bg};color:{fg}' title='{html.escape(tip)}'>{pct:.0f}</td>"
+        n_city, mark = filled_cells[(d, h)], ""
+        if n_city:
+            tip += f" - {n_city} filled from city data"
+            if 2 * n_city >= len(s):  # outline the cell when at least half of it is city data
+                mark = " class='city'"
+        return f"<td{mark} style='background:{bg};color:{fg}' title='{html.escape(tip)}'>{pct:.0f}</td>"
 
     newest_first = list(reversed(days))  # today first
     # wide screens: one row per day, hours across
@@ -364,15 +380,16 @@ def main():
 </div>"""
 
     city_note = (f'<p class="leg">Before {own[0][0]:%d %b %H:%M} the values come from the city\'s open-data sensor series '
-                 f'(Stadt Zürich, CC0) and may read higher than the live feed; from then on they are our own samples.</p>'
-                 if city else "")
+                 f'(Stadt Zürich, CC0) and may read higher than the live feed; from then on they are our own samples, '
+                 f'with gaps filled from the same city series where available. Dashed outline = at least half of that hour is city data.</p>'
+                 if city or filled else "")
 
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{html.escape(name)} occupancy</title>
 <style>{CSS}</style></head><body>
 <h1>{html.escape(name)} - occupancy</h1>
-<p class="s">Zurich time - {len(own)} own samples{f" + {len(city)} city sensor readings" if city else ""} since {rows[0][0]:%d %b %Y}, last sample {last_ts:%d %b %H:%M}</p>
+<p class="s">Zurich time - {len(own)} own samples{f" + {len(city) + len(filled)} city sensor readings" if city or filled else ""} since {rows[0][0]:%d %b %Y}, last sample {last_ts:%d %b %H:%M}</p>
 
 <h2>Live now</h2>
 {live}
